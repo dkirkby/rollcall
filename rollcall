@@ -1,0 +1,146 @@
+#!/usr/bin/env python
+
+import sys
+import argparse
+from pathlib import Path
+
+import numpy as np
+
+import PyPDF2 as pypdf
+
+import qrcode
+
+from PIL import Image, ImageDraw, ImageFont
+
+
+def main():
+    # Parse command-line arguments.
+    parser = argparse.ArgumentParser(
+        description='Prepare handouts for recording attendance.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('template', help='Template PDF file to use.')
+    parser.add_argument('-v', '--verbose', action='store_true',
+        help='Print verbose progress report')
+    parser.add_argument(
+        '-n', '--num-copies', type=int, metavar='N', required=True,
+        help='Number of copies to create')
+    parser.add_argument('--page-index', type=int, metavar='IDX', default=-1,
+        help='Index of template page where code is inserted (<0 counts from end)')
+    parser.add_argument('--keylen', type=int, metavar='K', default=8,
+        help='Random key length to use')
+    parser.add_argument('--seed', type=int, metavar='S', default=None,
+        help='Random seed to use for reproducible unique keys')
+    parser.add_argument('--pattern', metavar='PAT', default='{key}',
+        help='Pattern used to create QR code data for each key')
+    parser.add_argument('--qr-size', type=float, default=2.5, metavar='S',
+        help='Size of QR code (including white margin) in inches')
+    parser.add_argument('--qr-offset', type=float, default=1.5, metavar='O',
+        help='Offset of QR code from bottom of page in inches')
+    parser.add_argument('--font', default='Montserrat-Regular.ttf',
+        help='Name of truetype font to use for key labels')
+    args = parser.parse_args()
+    input_path = Path(args.template)
+    if not input_path.exists():
+        raise RuntimeError(f'Cannot read template file: "{input_path}".')
+    if args.num_copies <= 0:
+        raise ValueError('Argument num-copies must be > 0.')
+
+    # Load the requested font.
+    font = ImageFont.truetype(args.font, 16)
+
+    # Generate random keys.
+    gen = np.random.RandomState(args.seed)
+    maxtries = 10
+    keys = []
+    while maxtries > 0 and len(np.unique(keys)) < args.num_copies:
+        keys = gen.randint(10 ** args.keylen, size=args.num_copies)
+        maxtries -= 1
+    if maxtries == 0:
+        raise RuntimeError(f'Cannot generate {args.num_copies} unique keys. Try increasing keylen from {args.keylen}.')
+    fmt = f'{{key:0{args.keylen}d}}'
+    keys = [fmt.format(key=key) for key in keys]
+    keys_path = input_path.parent / (input_path.stem + '_keys.txt')
+    with open(keys_path, 'w') as f:
+        for key in keys:
+            print(key, file=f)
+    if args.verbose:
+        print(f'Wrote {args.num_copies} unique keys to "{keys_path}".')
+
+    # Prepare QR code data for each key.
+    data = [args.pattern.format(key=key) for key in keys]
+
+    # Check that we can read the template file and count the number of pages.
+    # https://stackoverflow.com/questions/13276409/how-to-add-image-to-pdf-file-in-python/13276519
+    with open(input_path, 'rb') as f:
+        template = pypdf.PdfFileReader(f)
+        npages = template.getNumPages()
+    if args.verbose:
+        print(f'Read "{args.template}" with {npages} page(s).')
+    # Convert a negative index to a postive one if necessary.
+    idx = list(range(npages))[args.page_index]
+    if args.verbose:
+        print(f'Codes will be inserted on page {idx + 1} of {npages}.')
+
+    # Write the output with num_copies of the template (no codes yet).
+    writer = pypdf.PdfFileWriter()
+    for c in range(args.num_copies):
+        reader = pypdf.PdfFileReader(str(input_path))
+        writer.appendPagesFromReader(reader)
+    tmp_path = input_path.parent / (input_path.stem + '_tmp.pdf')
+    with open(tmp_path, 'wb') as f:
+        writer.write(f)
+
+    # Initialize the output PDF writer.
+    writer = pypdf.PdfFileWriter()
+
+    # Open the replicated template file.
+    with open(tmp_path, 'rb') as f:
+        template = pypdf.PdfFileReader(f)
+
+        # Loop over QR code data to use.
+        for c in range(args.num_copies):
+            QR = qrcode.make(data[c])
+            name = f'qr_{c}.png'
+            QR.save(name)
+            img = Image.open(name).convert('L')
+            # Resize assuming 72 dpi
+            dpi = 72
+            w0, h0 = img.size
+            ratio = args.qr_size / (w0 / dpi)
+            w, h = round(w0 * ratio), round(h0 * ratio)
+            print('resize', (w0, h0), (w, h), ratio)
+            img = img.resize((w, h), resample=Image.NEAREST)
+            # Add bottom margin for text.
+            wp, hp = w, h + dpi // 2
+            padded = Image.new("L", (wp, hp), color=(255,))
+            padded.paste(img, (round((wp - w) / 2), 0))
+            # Add border and text.
+            draw = ImageDraw.Draw(padded)
+            draw.rectangle((1, 1, w - 2, h - 2), outline='black', fill=None)
+            wt, ht = draw.textsize(keys[c], font=font)
+            draw.text(((wp - wt) // 2, (h + hp - ht) // 2), keys[c], (0,), font=font)
+            # Save as QR overlay as PDF.
+            qr_name = f'qr_{c}.pdf'
+            padded.save(qr_name, format='pdf')
+
+            with open(qr_name, 'rb') as f1:
+                fg = pypdf.PdfFileReader(f1).getPage(0)
+                for p in range(npages):
+                    page = template.getPage(c * npages + p)
+                    if p == idx:
+                        page.mergePage(fg)
+                    writer.addPage(page)
+
+        output_path = input_path.parent / (input_path.stem + '_rollcall.pdf')
+        with open(output_path, 'wb') as f:
+            writer.write(f)
+        if args.verbose:
+            print(f'Wrote {args.num_copies} x {npages} pages to "{output_path}".')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as e:
+        print('ERROR:', e)
+        sys.exit(-1)
