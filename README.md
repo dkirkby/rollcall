@@ -26,7 +26,7 @@ Build the rollcall handouts using, for example:
 ```
 ./rollcall template.pdf --num-copies 10
 ```
-The output will be `template_rollcall.pdf` with 10 copies of `template.pdf`, each having a unique QR code on their last page.
+The output will be `template_rollcall.pdf` with 10 copies of `template.pdf`, each having a unique QR code on their last page. A list of the unique keys will also be written to `template_keys.txt`.
 
 To see the full list of options, use:
 ```
