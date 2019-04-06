@@ -1,0 +1,9 @@
+name: rollcall
+dependencies:
+  - python=3.7
+  - pip
+  - numpy
+  - pillow
+  - pip:
+    - PyPDF2
+    - qrcode
