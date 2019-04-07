@@ -3,6 +3,7 @@
 import sys
 import traceback
 import argparse
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -62,6 +63,8 @@ def main():
         help='Offset of QR code from bottom of page in inches')
     parser.add_argument('--font', default='Montserrat-Regular.ttf',
         help='Name of truetype font to use for key labels')
+    parser.add_argument('--tmpdir', default=None, metavar='DIR',
+        help='Directory to store temporary files (which will not be automatically deleted)')
     args = parser.parse_args()
     input_path = Path(args.template)
     if not input_path.exists():
@@ -104,11 +107,20 @@ def main():
     if args.verbose:
         print(f'Codes will be inserted on page {idx + 1} of {npages}.')
 
-    # Create each copy.
+    # Use a temporary directory for all temporary files.
+    if args.tmpdir is None:
+        toclean = tempfile.TemporaryDirectory()
+        tmpdir = Path(toclean.name)
+    else:
+        toclean = None
+        tmpdir = Path(args.tmpdir)
+        assert tmpdir.exists()
+
+    # Create and save each copy.
     for c in range(args.num_copies):
 
         # Generate a PDF with the QR code.
-        basename = str(input_path.parent / (input_path.stem + '_tmp'))
+        basename = str(tmpdir / (input_path.stem + '_tmp'))
         save_qr_as_pdf(basename, data[c], args.qr_size, font)
 
         # Read the generated PDF.
@@ -123,7 +135,6 @@ def main():
                 writer = pypdf.PdfFileWriter()
                 for p in range(npages):
                     page = template.getPage(p)
-                    print(QR.mediaBox, page.mediaBox)
                     if p == idx:
                         page.mergeTranslatedPage(
                             QR, tx=0.5 * (page.mediaBox.getWidth() - QR.mediaBox.getWidth()),
@@ -131,7 +142,7 @@ def main():
                     writer.addPage(page)
 
                 # Save this copy.
-                copy_path = input_path.parent / (input_path.stem + f'_{c}.pdf')
+                copy_path = tmpdir / (input_path.stem + f'_{c}.pdf')
                 with open(copy_path, 'wb') as fout:
                     writer.write(fout)
 
@@ -140,13 +151,18 @@ def main():
     open_files = []
     for c in range(args.num_copies):
         # All input files must remain open (!) until we write the merged output.
-        copy_path = input_path.parent / (input_path.stem + f'_{c}.pdf')
+        copy_path = tmpdir / (input_path.stem + f'_{c}.pdf')
         fin = open(copy_path, 'rb')
         open_files.append(fin)
         merger.append(fin)
     output_path = input_path.parent / (input_path.stem + '_rollcall.pdf')
     with open(output_path, 'wb') as fout:
         merger.write(fout)
+
+    # Cleanup temporary files if using an automatic temporary directory.
+    if toclean:
+        toclean.cleanup()
+
     if args.verbose:
         print(f'Wrote {args.num_copies} x {npages} pages to "{output_path}".')
 
