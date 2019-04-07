@@ -57,10 +57,14 @@ def main():
         help='Random seed to use for reproducible unique keys')
     parser.add_argument('--pattern', metavar='PAT', default='STUDENTKEY',
         help='Pattern used to embed STUDENTKEY into the QR data')
-    parser.add_argument('--qr-size', type=float, default=2.5, metavar='S',
+    parser.add_argument('--qr-size', type=float, default=2.0, metavar='S',
         help='Size of QR code (including white margin) in inches')
-    parser.add_argument('--qr-offset', type=float, default=1.0, metavar='O',
+    parser.add_argument('--qr-offset', type=float, default=0.5, metavar='O',
         help='Offset of QR code from bottom of page in inches')
+    parser.add_argument('--qr-align', choices=('left', 'center', 'right'), default='right',
+        help='Horizontal alignment of QR code')
+    parser.add_argument('--qr-margin', type=float, default=0.5, metavar='M',
+        help='Margin inset in inches when qr-align is left or right')
     parser.add_argument('--font', default='Montserrat-Regular.ttf',
         help='Name of truetype font to use for key labels')
     parser.add_argument('--tmpdir', default=None, metavar='DIR',
@@ -136,9 +140,14 @@ def main():
                 for p in range(npages):
                     page = template.getPage(p)
                     if p == idx:
-                        page.mergeTranslatedPage(
-                            QR, tx=0.5 * (page.mediaBox.getWidth() - QR.mediaBox.getWidth()),
-                            ty=72 * args.qr_offset)
+                        if args.qr_align == 'center':
+                            tx = 0.5 * (page.mediaBox.getWidth() - QR.mediaBox.getWidth())
+                        elif args.qr_align == 'left':
+                            tx = 72 * args.qr_margin
+                        elif args.qr_align == 'right':
+                            tx = page.mediaBox.getWidth() - QR.mediaBox.getWidth() - 72 * args.qr_margin
+                        ty = 72 * args.qr_offset
+                        page.mergeTranslatedPage(QR, tx=tx, ty=ty)
                     writer.addPage(page)
 
                 # Save this copy.
