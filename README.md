@@ -55,3 +55,7 @@ A convenient way to collect rollcall data if you do not have your own server is 
 ```
 ./rollcall template.pdf -n 10 --pattern 'https://docs.google.com/forms/...&entry.2097963549=STUDENTKEY'
 ```
+Some recommended non-default settings when you create your form:
+ - Set field where STUDENTKEY is entered to "Required".
+ - Disable "Show link to submit another response".
+ - Disable the "Limit to 1 response" option (since it requires a sign in).
