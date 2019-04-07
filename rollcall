@@ -108,7 +108,7 @@ def main():
     for c in range(args.num_copies):
 
         # Generate a PDF with the QR code.
-        basename = str(input_path.parent / (input_path.stem + f'_tmp_{c}'))
+        basename = str(input_path.parent / (input_path.stem + '_tmp'))
         save_qr_as_pdf(basename, data[c], args.qr_size, font)
 
         # Read the generated PDF.
