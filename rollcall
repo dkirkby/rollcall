@@ -15,7 +15,7 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
 
-def save_qr_as_pdf(basename, qr_data, qr_size, font):
+def save_qr_as_pdf(basename, qr_data, qr_key, qr_size, font):
     QR = qrcode.make(qr_data)
     QR.save(basename + '.png')
     img = Image.open(basename + '.png').convert('L')
@@ -32,8 +32,8 @@ def save_qr_as_pdf(basename, qr_data, qr_size, font):
     # Add border and text.
     draw = ImageDraw.Draw(padded)
     draw.rectangle((1, 1, w - 2, h - 2), outline='black', fill=None)
-    wt, ht = draw.textsize(qr_data, font=font)
-    draw.text(((wp - wt) // 2, (h + hp - ht) // 2), qr_data, (0,), font=font)
+    wt, ht = draw.textsize(qr_key, font=font)
+    draw.text(((wp - wt) // 2, (h + hp - ht) // 2), qr_key, (0,), font=font)
     # Save as QR overlay as PDF.
     padded.save(basename + '.pdf', format='pdf')
 
@@ -55,9 +55,9 @@ def main():
         help='Random key length to use')
     parser.add_argument('--seed', type=int, metavar='S', default=None,
         help='Random seed to use for reproducible unique keys')
-    parser.add_argument('--pattern', metavar='PAT', default='{key}',
-        help='Pattern used to create QR code data for each key')
-    parser.add_argument('--qr-size', type=float, default=1.5, metavar='S',
+    parser.add_argument('--pattern', metavar='PAT', default='STUDENTKEY',
+        help='Pattern used to embed STUDENTKEY into the QR data')
+    parser.add_argument('--qr-size', type=float, default=2.5, metavar='S',
         help='Size of QR code (including white margin) in inches')
     parser.add_argument('--qr-offset', type=float, default=1.0, metavar='O',
         help='Offset of QR code from bottom of page in inches')
@@ -94,7 +94,7 @@ def main():
         print(f'Wrote {args.num_copies} unique keys to "{keys_path}".')
 
     # Prepare QR code data for each key.
-    data = [args.pattern.format(key=key) for key in keys]
+    data = [args.pattern.replace('STUDENTKEY', key) for key in keys]
 
     # Check that we can read the template file and count the number of pages.
     with open(input_path, 'rb') as f:
@@ -121,7 +121,7 @@ def main():
 
         # Generate a PDF with the QR code.
         basename = str(tmpdir / (input_path.stem + '_tmp'))
-        save_qr_as_pdf(basename, data[c], args.qr_size, font)
+        save_qr_as_pdf(basename, data[c], keys[c], args.qr_size, font)
 
         # Read the generated PDF.
         with open(basename + '.pdf', 'rb') as fin1:
