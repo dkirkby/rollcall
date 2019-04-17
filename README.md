@@ -57,5 +57,7 @@ A convenient way to collect rollcall data if you do not have your own server is 
 ```
 Some recommended non-default settings when you create your form:
  - Set field where STUDENTKEY is entered to "Required".
+ - Enable "Response validation" for the STUDENTKEY field, using "Regular expression" + "Matches" + [0-9]{8} (assuming the default keylen=8)
  - Disable "Show link to submit another response".
+ - Disable the "Restrict to users in..." option, if present (since it requires a sign in ).
  - Disable the "Limit to 1 response" option (since it requires a sign in).
