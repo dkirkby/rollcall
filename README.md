@@ -2,6 +2,12 @@
 
 Record attendance in a classroom environment.
 
+Student outcomes generally improve with more frequent attendence at lectures, but it is challenging to require and verify attendance in a large, densely packed lecture hall without significant disruption and instructional time lost.
+
+This is a simple tool to convert any worksheet into a secure real-time roll call by embedding a unique QR code into each handout.  Students simply scan the code with their phone to automatically register their attendance.
+
+This was tool was tested in a lower-division physics class of 330 students over 10 weeks.  The outcome was an increase in average attendance from 25% to almost 90% and an improvement of 8.3 percentage points on a standardized score.
+
 ## Installation
 
 Install this package using:
